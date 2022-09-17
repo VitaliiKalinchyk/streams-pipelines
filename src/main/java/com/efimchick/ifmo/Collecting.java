@@ -63,9 +63,10 @@ public class Collecting {
                 .entrySet().stream().max(Comparator.comparingInt(Map.Entry::getValue)).orElseThrow().getKey();
     }
 
-    Collector printableStringCollector() {
+    Collector<CourseResult, ArrayList<ArrayList<String>>, String> printableStringCollector() {
 
         longestName = 0;
+        isPrograming = false;
 
         final String programmingString = "Lab 1. Figures | Lab 2. War and Peace | Lab 3. File Tree | Total | Mark |\n";
         final String historyString = "Phalanxing | Shieldwalling | Tercioing | Wedging | Total | Mark |\n";
@@ -91,9 +92,8 @@ public class Collecting {
 
             int[] modifiers = isPrograming ? programmingStringModifiers : historyStringModifiers;
             ArrayList<Integer> list = new ArrayList<>(currentMap.values());
-            for (int i = 0; i < list.size(); i++) {
-                currentList.add(String.format("%"+modifiers[i]+"d | ", list.get(i)));
-            }
+            IntStream.range(0, list.size()).forEach(i ->
+                                                currentList.add(String.format("%"+modifiers[i]+"d | ", list.get(i))));
 
             double total = list.stream().mapToDouble(Double::valueOf).average().orElse(0);
             currentList.add(String.format("%2.2f | ", total));
@@ -106,6 +106,7 @@ public class Collecting {
             String first = String.format("%-"+longestName+"s | ","Student") +
                     (isPrograming ? programmingString : historyString);
             stringBuilder.append(first);
+
             arrayLists.sort(Comparator.comparing(o -> o.get(0)));
             for (ArrayList<String> arrayList : arrayLists) {
                 stringBuilder.append(String.format("%-"+longestName+"s | ", arrayList.get(0)));
@@ -147,15 +148,15 @@ public class Collecting {
 
     private LinkedHashMap<String, Integer> returnMap(boolean isPrograming) {
         return isPrograming ? new LinkedHashMap<>(){{
-            put("Lab 1. Figures", 0);
-            put("Lab 2. War and Peace", 0);
-            put("Lab 3. File Tree", 0);
-            }}
-            : new LinkedHashMap<>(){{
-                    put("Phalanxing", 0);
-                    put("Shieldwalling", 0);
-                    put("Tercioing", 0);
-                    put("Wedging", 0);
-                }};
+                                    put("Lab 1. Figures", 0);
+                                    put("Lab 2. War and Peace", 0);
+                                    put("Lab 3. File Tree", 0);
+                              }}
+                            : new LinkedHashMap<>(){{
+                                    put("Phalanxing", 0);
+                                    put("Shieldwalling", 0);
+                                    put("Tercioing", 0);
+                                    put("Wedging", 0);
+                              }};
     }
 }
