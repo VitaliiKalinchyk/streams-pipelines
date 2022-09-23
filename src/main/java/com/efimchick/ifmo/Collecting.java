@@ -9,10 +9,6 @@ import java.util.stream.*;
 
 public class Collecting {
 
-    private boolean isPrograming;
-
-    private int longestName;
-
     int sum(IntStream stream) {
         return stream.sum();
     }
@@ -89,79 +85,21 @@ public class Collecting {
                      .getKey();
     }
 
-    Collector<CourseResult, ArrayList<ArrayList<String>>, String> printableStringCollector() {
+    Collector<CourseResult, ArrayList<CourseResult>, String> printableStringCollector() {
 
-        longestName = 0;
-        isPrograming = false;
+        Function<ArrayList<CourseResult>, String> finisher = courseResults -> {
+            courseResults.sort(Comparator.comparing(o -> o.getPerson().getLastName()));
+            int longestName = longestName(courseResults);
+            TreeMap<String, Integer> disciples = disciples(courseResults);
+            int[] modifiers = disciples.keySet().stream().mapToInt(String::length).toArray();
 
-        final String programmingString = "Lab 1. Figures | Lab 2. War and Peace | Lab 3. File Tree | Total | Mark |\n";
-        final String historyString = "Phalanxing | Shieldwalling | Tercioing | Wedging | Total | Mark |\n";
+            StringBuilder sb = titleString(longestName, disciples.keySet());
+            courseResults.forEach(student -> sb.append(personToString(longestName, modifiers, disciples, student)));
+            sb.append(lastString(longestName, modifiers, courseResults));
 
-        final int[] programmingStringModifiers = {14, 20, 16, 5, 4};
-        final int[] historyStringModifiers = {10, 13, 9, 7, 5, 4};
-
-
-        BiConsumer<ArrayList<ArrayList<String>>, CourseResult> accumulator = (arrayList, courseResult) -> {
-
-            ArrayList<String> currentList = new ArrayList<>();
-
-            Person person = courseResult.getPerson();
-            String name = person.getLastName() + " " + person.getFirstName();
-            longestName = Math.max(longestName, name.length());
-            currentList.add(name);
-
-            Map<String, Integer> map = courseResult.getTaskResults();
-            LinkedHashMap<String, Integer> currentMap;
-            isPrograming = map.containsKey("Lab 1. Figures");
-            currentMap = returnMap(isPrograming);
-            currentMap.putAll(map);
-
-            int[] modifiers = isPrograming ? programmingStringModifiers : historyStringModifiers;
-            ArrayList<Integer> list = new ArrayList<>(currentMap.values());
-            IntStream.range(0, list.size()).forEach(i ->
-                                                currentList.add(String.format("%"+modifiers[i]+"d | ", list.get(i))));
-
-            double total = list.stream().mapToDouble(Double::valueOf).average().orElse(0);
-            currentList.add(String.format("%2.2f | ", total));
-            currentList.add(String.format("%4s |\n", mark(total)));
-            arrayList.add(currentList);
+            return sb.toString();
         };
-
-        Function<ArrayList<ArrayList<String>>, String> finisher = arrayLists -> {
-            StringBuilder stringBuilder = new StringBuilder();
-            String first = String.format("%-"+longestName+"s | ","Student") +
-                    (isPrograming ? programmingString : historyString);
-            stringBuilder.append(first);
-
-            arrayLists.sort(Comparator.comparing(o -> o.get(0)));
-            for (ArrayList<String> arrayList : arrayLists) {
-                stringBuilder.append(String.format("%-"+longestName+"s | ", arrayList.get(0)));
-                for (int i = 1; i < arrayList.size(); i++) {
-                    stringBuilder.append(arrayList.get(i));
-                }
-            }
-
-            stringBuilder.append(String.format("%-"+longestName+"s | ","Average"));
-            int[] modifiers = isPrograming ? programmingStringModifiers : historyStringModifiers;
-
-            double z = 0;
-            int count = isPrograming ? 3 : 4;
-            for (int i = 0; i < count; i++) {
-                double x = 0;
-                for (ArrayList<String> arrayList : arrayLists) {
-                    x += Integer.parseInt(arrayList.get(i + 1).replaceAll("\\D", ""));
-                }
-                x /= 3;
-                z += x;
-                stringBuilder.append(String.format("%"+modifiers[i]+".2f | ", x));
-            }
-            double total = z / count;
-            stringBuilder.append(String.format("%2.2f | ", total));
-            stringBuilder.append(String.format("%4s |", mark(total)));
-
-            return stringBuilder.toString();
-        };
-        return Collector.of(ArrayList::new, accumulator, (e1, e2) -> e2, finisher);
+        return Collector.of(ArrayList::new, ArrayList::add, (e1, e2) -> e2, finisher);
     }
 
     private String mark(double mark) {
@@ -172,17 +110,68 @@ public class Collecting {
                             "E" : "F";
     }
 
-    private LinkedHashMap<String, Integer> returnMap(boolean isPrograming) {
-        return isPrograming ? new LinkedHashMap<>(){{
-                                    put("Lab 1. Figures", 0);
-                                    put("Lab 2. War and Peace", 0);
-                                    put("Lab 3. File Tree", 0);
-                              }}
-                            : new LinkedHashMap<>(){{
-                                    put("Phalanxing", 0);
-                                    put("Shieldwalling", 0);
-                                    put("Tercioing", 0);
-                                    put("Wedging", 0);
-                              }};
+    private int longestName(ArrayList<CourseResult> courseResults) {
+        return courseResults.stream()
+                            .map(CourseResult::getPerson)
+                            .map(e -> e.getLastName() + e.getFirstName())
+                            .mapToInt(String::length)
+                            .max().orElse(0) + 1;
+    }
+
+    private TreeMap<String, Integer> disciples(ArrayList<CourseResult> courseResults) {
+        return courseResults.stream()
+                            .map(CourseResult::getTaskResults)
+                            .map(Map::keySet).flatMap(Set::stream)
+                            .distinct()
+                            .collect(Collectors.toMap(Function.identity(), e -> 0, Integer::sum, TreeMap::new));
+    }
+
+    private StringBuilder titleString(int longestName, Set<String> disciples) {
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append(String.format("%-"+longestName+"s | ","Student"));
+        disciples.forEach(s -> stringBuilder.append(s).append(" | "));
+        stringBuilder.append("Total | Mark |\n");
+        return stringBuilder;
+    }
+
+    private StringBuilder lastString(int longestName, int[] modifiers, ArrayList<CourseResult> courseResults) {
+
+        StringBuilder stringBuilder = new StringBuilder();
+
+        stringBuilder.append(String.format("%-"+longestName+"s | ","Average"));
+
+        TreeMap<String, Double> averageMarksMap = new TreeMap<>(averageScoresPerTask(courseResults.stream()));
+        ArrayList<Double> averageMarks = new ArrayList<>(averageMarksMap.values());
+        IntStream.range(0, averageMarks.size()).forEach(i ->
+                stringBuilder.append(String.format("%"+modifiers[i]+".2f | ", averageMarks.get(i))));
+
+        double total = averageMarks.stream().mapToDouble(Double::valueOf).average().orElse(0);
+        stringBuilder.append(String.format("%2.2f | ", total));
+        stringBuilder.append(String.format("%4s |", mark(total)));
+
+        return stringBuilder;
+    }
+
+    private StringBuilder personToString(int longestName, int[] modifiers,
+                                  TreeMap<String, Integer> disciples, CourseResult courseResult) {
+
+        StringBuilder stringBuilder = new StringBuilder();
+
+        Person person = courseResult.getPerson();
+        String name = person.getLastName() + " " + person.getFirstName();
+        stringBuilder.append(String.format("%-"+longestName+"s | ", name));
+
+        ArrayList<Integer> marks = new ArrayList<>(new TreeMap<String, Integer>(){{
+            putAll(disciples);
+            putAll(courseResult.getTaskResults());
+        }}.values());
+        IntStream.range(0, marks.size()).forEach(i ->
+                stringBuilder.append(String.format("%"+modifiers[i]+"d | ", marks.get(i))));
+
+        double total = marks.stream().mapToDouble(Double::valueOf).average().orElse(0);
+        stringBuilder.append(String.format("%2.2f | ", total));
+        stringBuilder.append(String.format("%4s |\n", mark(total)));
+
+        return stringBuilder;
     }
 }
