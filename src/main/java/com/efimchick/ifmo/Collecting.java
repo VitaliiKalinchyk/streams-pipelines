@@ -156,7 +156,7 @@ public class Collecting {
                 stringBuilder.append(String.format("%"+modifiers[i]+".2f | ", x));
             }
             double total = z / count;
-            stringBuilder.append(String.format("%"+modifiers[++count]+".2f | ", total));
+            stringBuilder.append(String.format("%2.2f | ", total));
             stringBuilder.append(String.format("%4s |", mark(total)));
 
             return stringBuilder.toString();
