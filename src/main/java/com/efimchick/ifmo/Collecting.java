@@ -18,49 +18,75 @@ public class Collecting {
     }
 
     int production(IntStream stream) {
-        return stream.reduce((e1, e2) -> e1 * e2).orElse(0);
+        return stream.reduce(Math::multiplyExact).orElse(0);
     }
     int oddSum(IntStream stream) {
         return stream.filter(e -> e % 2 != 0).sum();
     }
 
     Map<Integer, Integer> sumByRemainder(int divisor, IntStream stream) {
-        return stream.boxed().collect(Collectors.toMap(e -> e % divisor, Function.identity(), Integer::sum));
+        return stream.boxed().collect(Collectors.groupingBy(e -> e % divisor,Collectors.summingInt(e -> e)));
+       //return stream.boxed().collect(Collectors.toMap(e -> e % divisor, Function.identity(), Integer::sum));
     }
 
     Map<Person, Double> totalScores(Stream<CourseResult> stream) {
-        return stream.collect(Collectors.toMap(CourseResult::getPerson,
-                courseResult -> {
-                    var map = courseResult.getTaskResults();
-                    int x = map.containsKey("Lab 1. Figures") ? 3 : 4;
-                    return map.values().stream().mapToDouble(Double::valueOf).sum() / x;}));
+        List<CourseResult> courseResults = stream.collect(Collectors.toList());
+        long count = courseResults.stream()
+                                  .map(CourseResult::getTaskResults)
+                                  .flatMap(e -> e.keySet().stream())
+                                  .distinct()
+                                  .count();
+        return courseResults.stream().collect(Collectors.toMap(CourseResult::getPerson,
+                courseResult -> courseResult.getTaskResults()
+                                            .values()
+                                            .stream()
+                                            .mapToDouble(Double::valueOf)
+                                            .sum() / count));
     }
 
     Double averageTotalScore(Stream<CourseResult> stream) {
-        var map = stream.flatMap(courseResult -> courseResult.getTaskResults().entrySet().stream())
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, Integer::sum));
-        int x = map.containsKey("Lab 1. Figures") ? 9 : 12;
-        return map.values().stream().mapToDouble(Double::valueOf).sum() / x;
+        List<CourseResult> courseResults = stream.collect(Collectors.toList());
+        long persons = courseResults.stream().map(CourseResult::getPerson).count();
+        long disciples = courseResults.stream()
+                                      .map(CourseResult::getTaskResults)
+                                      .flatMap(e -> e.keySet().stream())
+                                      .distinct()
+                                      .count();
+        return courseResults.stream()
+                            .map(CourseResult::getTaskResults)
+                            .flatMap(e -> e.values().stream())
+                            .mapToDouble(Double::valueOf).sum() / (persons * disciples);
     }
 
     Map<String, Double> averageScoresPerTask(Stream<CourseResult> stream) {
-        return stream.flatMap(courseResult -> courseResult.getTaskResults().entrySet().stream())
-                .collect(Collectors.toMap(Map.Entry::getKey, entrySet -> entrySet.getValue() / 3d, Double::sum));
+        List<CourseResult> courseResults = stream.collect(Collectors.toList());
+        double persons = courseResults.stream().map(CourseResult::getPerson).count();
+        return courseResults.stream().flatMap(courseResult -> courseResult.getTaskResults().entrySet().stream())
+                .collect(Collectors.toMap(Map.Entry::getKey, entrySet -> entrySet.getValue() / persons, Double::sum));
     }
 
     Map<Person, String> defineMarks(Stream<CourseResult> stream) {
-        return stream.collect(Collectors.toMap(CourseResult::getPerson,
-                courseResult -> {
-                    var map = courseResult.getTaskResults();
-                    int divisor = map.containsKey("Lab 1. Figures") ? 3 : 4;
-                    var total = map.values().stream().mapToDouble(Double::valueOf).sum() / divisor;
-                    return mark(total);}));
+        List<CourseResult> list = stream.collect(Collectors.toList());
+        long count = list.stream().map(CourseResult::getTaskResults)
+                                  .flatMap(e -> e.keySet().stream())
+                                  .distinct()
+                                  .count();
+        return list.stream().collect(Collectors.toMap(CourseResult::getPerson,
+                                        courseResult -> mark(courseResult.getTaskResults()
+                                                                         .values()
+                                                                         .stream()
+                                                                         .mapToDouble(Double::valueOf)
+                                                                         .sum() / count)));
     }
 
     String easiestTask(Stream<CourseResult> stream) {
         return stream.flatMap(courseResult -> courseResult.getTaskResults().entrySet().stream())
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, Integer::sum))
-                .entrySet().stream().max(Comparator.comparingInt(Map.Entry::getValue)).orElseThrow().getKey();
+                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, Integer::sum))
+                     .entrySet()
+                     .stream()
+                     .max(Comparator.comparingInt(Map.Entry::getValue))
+                     .orElseThrow()
+                     .getKey();
     }
 
     Collector<CourseResult, ArrayList<ArrayList<String>>, String> printableStringCollector() {
